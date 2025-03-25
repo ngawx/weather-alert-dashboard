@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const NOAA_API_URL = "https://api.allorigins.win/raw?url=https://api.weather.gov/alerts/active";
+const NOAA_API_URL = "https://api.weather.gov/alerts/active";
 
 export const fetchWeatherAlerts = async () => {
   try {

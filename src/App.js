@@ -9,18 +9,38 @@ function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [autoScroll, setAutoScroll] = useState(true);
   const alertsPerPage = 4;
+  const resumeTimeout = useRef(null);
 
-  const resumeTimeout = useRef(null); // 🆕 to track auto-resume timer
+  // 🔍 Filter alerts for NWS Peachtree City (FFC)
+  const filteredAlerts = alerts.filter(
+    (alert) =>
+      alert.properties.senderName &&
+      alert.properties.senderName.toLowerCase().includes("nws peachtree city")
+  );
 
+  // Auto-scroll every 8 seconds
+  useEffect(() => {
+    if (!autoScroll || filteredAlerts.length <= alertsPerPage) return;
+
+    const interval = setInterval(() => {
+      setCurrentIndex((prevIndex) => {
+        const nextIndex = prevIndex + alertsPerPage;
+        return nextIndex >= filteredAlerts.length ? 0 : nextIndex;
+      });
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [filteredAlerts, autoScroll]);
+
+  // Fetch alerts from NOAA
   useEffect(() => {
     const loadAlerts = async () => {
       try {
         const data = await fetchWeatherAlerts();
-        console.log("Loaded alerts:", data);
         setAlerts(Array.isArray(data) ? data : []);
         setLastUpdated(new Date().toLocaleString());
       } catch (error) {
-        console.error("Error loading alerts:", error);
+        console.error("Error fetching weather alerts:", error);
         setAlerts([]);
       }
     };
@@ -30,33 +50,19 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Clock update
   useEffect(() => {
     const clock = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(clock);
   }, []);
 
-  // ✅ Auto-scroll with resume logic
-  useEffect(() => {
-    if (!autoScroll || alerts.length <= alertsPerPage) return;
-
-    const interval = setInterval(() => {
-      setCurrentIndex((prevIndex) => {
-        const nextIndex = prevIndex + alertsPerPage;
-        return nextIndex >= alerts.length ? 0 : nextIndex;
-      });
-    }, 8000);
-
-    return () => clearInterval(interval);
-  }, [alerts, autoScroll]);
-
-  // ✅ Restart auto-scroll after 10s
+  // Pause auto-scroll, resume after 10 seconds
   const pauseAndResumeAutoScroll = () => {
     setAutoScroll(false);
     if (resumeTimeout.current) clearTimeout(resumeTimeout.current);
-
     resumeTimeout.current = setTimeout(() => {
       setAutoScroll(true);
-    }, 10000); // 10 seconds
+    }, 10000);
   };
 
   const handleTileClick = () => {
@@ -66,14 +72,14 @@ function App() {
   const handleNext = () => {
     pauseAndResumeAutoScroll();
     setCurrentIndex((prev) =>
-      (prev + alertsPerPage) >= alerts.length ? 0 : prev + alertsPerPage
+      (prev + alertsPerPage) >= filteredAlerts.length ? 0 : prev + alertsPerPage
     );
   };
 
   const handlePrev = () => {
     pauseAndResumeAutoScroll();
     setCurrentIndex((prev) =>
-      prev === 0 ? Math.max(alerts.length - alertsPerPage, 0) : prev - alertsPerPage
+      prev === 0 ? Math.max(filteredAlerts.length - alertsPerPage, 0) : prev - alertsPerPage
     );
   };
 
@@ -111,7 +117,7 @@ function App() {
     });
   };
 
-  const visibleAlerts = alerts.slice(currentIndex, currentIndex + alertsPerPage);
+  const visibleAlerts = filteredAlerts.slice(currentIndex, currentIndex + alertsPerPage);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6 flex flex-col items-center relative">
@@ -121,11 +127,11 @@ function App() {
       </div>
 
       {/* Title */}
-      <h1 className="text-3xl font-bold text-center mb-2">U.S. Weather Alert Dashboard</h1>
+      <h1 className="text-3xl font-bold text-center mb-2">NWS Peachtree City Alerts</h1>
 
       {/* Total Alerts */}
       <div className="text-center text-lg font-semibold bg-gray-800 px-6 py-2 rounded-full border-2 border-white shadow-md mb-6">
-        Active Alerts: {alerts.length}
+        Active Alerts: {filteredAlerts.length}
       </div>
 
       {/* Last Updated */}
@@ -135,47 +141,51 @@ function App() {
 
       {/* Alert Tiles */}
       <div className="w-full max-w-xl">
-        <AnimatePresence mode="wait">
-          {visibleAlerts.map((alert, index) => {
-            const {
-              event,
-              areaDesc,
-              effective,
-              expires,
-            } = alert.properties;
+        {filteredAlerts.length === 0 ? (
+          <div className="text-center text-gray-400">No active alerts from NWS Peachtree City.</div>
+        ) : (
+          <AnimatePresence mode="wait">
+            {visibleAlerts.map((alert, index) => {
+              const {
+                event,
+                areaDesc,
+                effective,
+                expires,
+              } = alert.properties;
 
-            const alertStyle = getAlertStyles(event);
-            const counties = areaDesc?.replace(/;/g, ", ") || "Unknown";
+              const alertStyle = getAlertStyles(event);
+              const counties = areaDesc?.replace(/;/g, ", ") || "Unknown";
 
-            return (
-              <motion.div
-                key={index}
-                onClick={handleTileClick}
-                className={`p-3 mb-3 ${alertStyle} border-l-8 rounded-md shadow-md cursor-pointer transition-transform hover:scale-[1.01]`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.4 }}
-              >
-                <h2 className="text-lg font-bold leading-snug">{event}</h2>
+              return (
+                <motion.div
+                  key={index}
+                  onClick={handleTileClick}
+                  className={`p-3 mb-3 ${alertStyle} border-l-8 rounded-md shadow-md cursor-pointer transition-transform hover:scale-[1.01]`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <h2 className="text-lg font-bold leading-snug">{event}</h2>
 
-                <p className="text-xs mt-2">
-                  🕒 <strong>Effective:</strong> {formatTime(effective)}
-                  <br />
-                  ⏳ <strong>Expires:</strong> {formatTime(expires)}
-                </p>
+                  <p className="text-xs mt-2">
+                    🕒 <strong>Effective:</strong> {formatTime(effective)}
+                    <br />
+                    ⏳ <strong>Expires:</strong> {formatTime(expires)}
+                  </p>
 
-                <p className="text-xs mt-2 text-gray-200">
-                  📍 <strong>Counties Affected:</strong> {counties}
-                </p>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+                  <p className="text-xs mt-2 text-gray-200">
+                    📍 <strong>Counties Affected:</strong> {counties}
+                  </p>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        )}
       </div>
 
       {/* Navigation Buttons */}
-      {alerts.length > alertsPerPage && (
+      {filteredAlerts.length > alertsPerPage && (
         <div className="mt-4 flex gap-4">
           <button
             onClick={handlePrev}
