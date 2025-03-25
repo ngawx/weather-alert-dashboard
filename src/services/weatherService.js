@@ -1,18 +1,14 @@
 import axios from "axios";
 
-const NOAA_API_URL = "https://api.weather.gov/alerts/active";
+// Using CORS proxy to avoid browser restrictions on User-Agent header
+const NOAA_API_URL = "https://corsproxy.io/?https://api.weather.gov/alerts/active";
 
 export const fetchWeatherAlerts = async () => {
   try {
-    const response = await axios.get(NOAA_API_URL, {
-      headers: {
-        "User-Agent": "weather-alert-dashboard (pj.gudz@example.com)",
-        "Accept": "application/ld+json",
-      },
-    });
+    const response = await axios.get(NOAA_API_URL);
     return response.data.features;
   } catch (error) {
-    console.error("Error fetching alerts:", error);
+    console.error("Error fetching weather alerts:", error);
     return [];
   }
 };
