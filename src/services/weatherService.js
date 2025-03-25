@@ -1,7 +1,6 @@
 import axios from "axios";
 
-// Using CORS proxy to avoid browser restrictions on User-Agent header
-const NOAA_API_URL = "https://corsproxy.io/?https://api.weather.gov/alerts/active";
+const NOAA_API_URL = "https://api.allorigins.win/raw?url=https://api.weather.gov/alerts/active";
 
 export const fetchWeatherAlerts = async () => {
   try {
